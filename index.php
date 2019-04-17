@@ -1,23 +1,21 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <title>URL shortener</title>
 <meta name="robots" content="noindex, nofollow">
-</html>
 <body>
 <form method="post" action="shorten.php" id="shortener">
-<label for="longurl">URL to shorten</label> <input type="text" name="longurl" id="longurl"> <input type="submit" value="Shorten">
+    <label>URL to shorten <input type="text" name="url" id="url"></label> <input type="submit" value="Shorten">
 </form>
-</form>
-<script src="//ajax.googleapis.com/ajax/libs/jquery/1.3.2/jquery.min.js"></script>
+<script src="https://code.jquery.com/jquery-3.4.0.min.js"></script>
 <script>
-$(function () {
-	$('#shortener').submit(function () {
-		$.ajax({data: {longurl: $('#longurl').val()}, url: 'shorten.php', complete: function (XMLHttpRequest, textStatus) {
-			$('#longurl').val(XMLHttpRequest.responseText);
-		}});
-		return false;
-	});
-});
+    (function ($) {
+        $('#shortener').submit(function (e) {
+            $.post('shorten.php', {url: $('#url').val()}, function (data) {
+                $('#url').val(data);
+            });
+            e.preventDefault();
+        });
+    })(jQuery);
 </script>
 </body>
 </html>

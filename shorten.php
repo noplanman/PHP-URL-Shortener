@@ -3,63 +3,65 @@
  * First authored by Brian Cray
  * License: http://creativecommons.org/licenses/by/3.0/
  * Contact the author at http://briancray.com/
+ *
+ * Improved by Armando Lüscher <https://noplanman.ch>
  */
- 
+
 ini_set('display_errors', 0);
 
-$url_to_shorten = get_magic_quotes_gpc() ? stripslashes(trim($_REQUEST['longurl'])) : trim($_REQUEST['longurl']);
+$url_to_shorten = get_magic_quotes_gpc() ? stripslashes(trim($_REQUEST['url'])) : trim($_REQUEST['url']);
 
-if(!empty($url_to_shorten) && preg_match('|^https?://|', $url_to_shorten))
-{
-	require('config.php');
-
-	// check if the client IP is allowed to shorten
-	if($_SERVER['REMOTE_ADDR'] != LIMIT_TO_IP)
-	{
-		die('You are not allowed to shorten URLs with this service.');
-	}
-	
-	// check if the URL is valid
-	if(CHECK_URL)
-	{
-		$ch = curl_init();
-		curl_setopt($ch, CURLOPT_URL, $url_to_shorten);
-		curl_setopt($ch,  CURLOPT_RETURNTRANSFER, TRUE);
-		$response = curl_exec($ch);
-		$response_status = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-		curl_close($ch);
-		if($response_status == '404')
-		{
-			die('Not a valid URL');
-		}
-		
-	}
-	
-	// check if the URL has already been shortened
-	$already_shortened = mysql_result(mysql_query('SELECT id FROM ' . DB_TABLE. ' WHERE long_url="' . mysql_real_escape_string($url_to_shorten) . '"'), 0, 0);
-	if(!empty($already_shortened))
-	{
-		// URL has already been shortened
-		$shortened_url = getShortenedURLFromID($already_shortened);
-	}
-	else
-	{
-		// URL not in database, insert
-		mysql_query('LOCK TABLES ' . DB_TABLE . ' WRITE;');
-		mysql_query('INSERT INTO ' . DB_TABLE . ' (long_url, created, creator) VALUES ("' . mysql_real_escape_string($url_to_shorten) . '", "' . time() . '", "' . mysql_real_escape_string($_SERVER['REMOTE_ADDR']) . '")');
-		$shortened_url = getShortenedURLFromID(mysql_insert_id());
-		mysql_query('UNLOCK TABLES');
-	}
-	echo BASE_HREF . $shortened_url;
+// Make sure we have a valid URL
+if (empty($url_to_shorten) || !preg_match('|^https?://|', $url_to_shorten)) {
+    die('Invalid URL');
 }
 
-function getShortenedURLFromID ($integer, $base = ALLOWED_CHARS)
+require_once __DIR__ . '/config.php';
+
+// Check if the client IP is allowed to shorten
+if (!in_array($_SERVER['REMOTE_ADDR'], LIMIT_TO_IPS, true)) {
+    die('You are not allowed to shorten URLs with this service.');
+}
+
+// Check if this URL has already been shortened
+$url_id = $pdo->query('SELECT `id` FROM ' . DB_TABLE . ' WHERE `url`=' . $pdo->quote($url_to_shorten))->fetchColumn();
+if (empty($url_id)) {
+    $sth = $pdo->prepare('INSERT INTO ' . DB_TABLE . ' (id, url, creator) VALUES (?, ?, ?)');
+
+    // Failsafe for duplicate ID generation.
+    $fails = 0;
+    do {
+        try {
+            $url_id = generateUrlId();
+            $ok     = $sth->execute([$url_id, $url_to_shorten, $_SERVER['REMOTE_ADDR']]);
+        } catch (Throwable $e) {
+            // Silent catch
+        }
+    } while (!$ok && ++$fails < 5);
+
+    if ($fails >= 5) {
+        die('Need to increase the URL ID character count.');
+    }
+}
+
+echo BASE_HREF . $url_id;
+
+/**
+ * Generate a random URL ID
+ *
+ * @param int $length
+ *
+ * @return string
+ * @throws Exception
+ */
+function generateUrlId($length = URL_ID_LENGTH): string
 {
-	$length = strlen($base);
-	while($integer > $length - 1)
-	{
-		$out = $base[fmod($integer, $length)] . $out;
-		$integer = floor( $integer / $length );
-	}
-	return $base[$integer] . $out;
+    $chars_num = strlen(ALLOWED_CHARS);
+    $url_id    = '';
+
+    while ($length--) {
+        $url_id .= ALLOWED_CHARS[random_int(0, $chars_num - 1)];
+    }
+
+    return $url_id;
 }
