@@ -25,6 +25,6 @@ if (TRACK) {
     $pdo->exec('UPDATE ' . DB_TABLE . ' SET `clicks`=`clicks`+1 WHERE `id`=' . $pdo->quote($url_id));
 }
 
-header('HTTP/1.1 301 Moved Permanently');
+header('HTTP/1.1 ' . REDIRECT_RESPONSE_CODE);
 header('Location: ' . $url);
 exit;

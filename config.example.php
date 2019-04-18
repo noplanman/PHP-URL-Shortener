@@ -26,6 +26,9 @@ try {
 // base location of script (include trailing slash)
 define('BASE_HREF', 'http://' . $_SERVER['HTTP_HOST'] . '/');
 
+// define the redirect response code
+define('REDIRECT_RESPONSE_CODE', '301 Moved Permanently');
+
 // limit short url creation to defined IPs
 define('LIMIT_TO_IPS', [$_SERVER['REMOTE_ADDR']]);
 
